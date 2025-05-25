@@ -13,16 +13,18 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Pull latest changes
-        run: |
-          git fetch origin
-          git reset --hard origin/main
- 
+      - name: Fetch all branches and full history
+        run: git fetch --prune --unshallow
+
+      - name: Reset to latest main
+        run: git reset --hard origin/master
 
       - name: Install backend dependencies
         run: |
           cd ~/ECHOMATELITE/echo-mate-lite-main/backend
           npm install --production
+
+
 
       - name: Install frontend dependencies and build
         run: |
