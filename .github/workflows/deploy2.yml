@@ -2,7 +2,7 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ master ]
+    branches: [  master ]  # Adjust based on your branch name
 
 jobs:
   deploy:
@@ -17,21 +17,6 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install backend dependencies
-        run: |
-          cd echo-mate-lite-main/backend
-          npm install
-
-      - name: Install frontend dependencies
-        run: |
-          cd echo-mate-lite-main/frontend/twitterclone
-          npm install
-
-      - name: Build frontend
-        run: |
-          cd echo-mate-lite-main/frontend/twitterclone
-          CI=false npm run build
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -40,7 +25,6 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/ECHOMATELITE/echo-mate-lite-main
-
             git pull origin main
 
             cd backend
@@ -55,5 +39,3 @@ jobs:
 
             pm2 restart echomatelite-backend || pm2 start index.js --name echomatelite-backend
             sudo systemctl reload apache2
-
-            echo "✅ Deployment completed!"
