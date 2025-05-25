@@ -1,0 +1,37 @@
+stages:
+  - deploy
+
+deploy_to_ec2:
+  stage: deploy
+  image: node:18
+  only:
+    - main
+  before_script:
+    - apt-get update -y
+    - apt-get install -y openssh-client
+
+  script:
+    - mkdir -p ~/.ssh
+    - echo "$EC2_SSH_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan $EC2_HOST >> ~/.ssh/known_hosts
+
+    - ssh $EC2_USERNAME@$EC2_HOST << 'EOF'
+        cd ~/ECHOMATELITE/echo-mate-lite-main
+        git pull origin main
+
+        cd backend
+        npm install --production
+
+        cd ../frontend/twitterclone
+        npm install
+        npm run build
+
+        sudo rm -rf /var/www/html/*
+        sudo cp -r build/* /var/www/html/
+
+        pm2 restart echomatelite-backend || pm2 start index.js --name echomatelite-backend
+
+        sudo systemctl reload apache2
+        echo "✅ Deployment done from GitLab CI/CD!"
+      EOF
