@@ -1,0 +1,68 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm install
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend/twitterclone
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd frontend/twitterclone
+          npm run build
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Navigate to the project root
+            cd ~/ECHOMATELITE/echo-mate-lite-main
+
+            # Pull the latest code from the correct branch
+            git pull origin $(git rev-parse --abbrev-ref HEAD)
+
+            # Install backend dependencies
+            cd backend
+            npm install --production
+
+            # Build frontend
+            cd ../frontend/twitterclone
+            npm install
+            npm run build
+
+            # Clean old files from Apache root and deploy new build
+            sudo rm -rf /var/www/html/*
+            sudo cp -r build/* /var/www/html/
+
+            # Restart backend server with PM2
+            pm2 restart echomatelite-backend || pm2 start index.js --name echomatelite-backend
+
+            # Reload Apache
+            sudo systemctl reload apache2
+
+            echo "✅ Deployment completed successfully!"
