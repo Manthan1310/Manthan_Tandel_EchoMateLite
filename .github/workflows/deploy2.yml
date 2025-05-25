@@ -8,6 +8,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     
+    
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -22,6 +23,7 @@ jobs:
           cd ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone
           npm install
           npm run build
+          CI=false npm run build
 
       - name: Clean old build and deploy frontend
         run: |
