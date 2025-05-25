@@ -13,6 +13,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      - name: Pull latest changes
+        run: |
+          git fetch origin
+          git reset --hard origin/main
+ 
+
       - name: Install backend dependencies
         run: |
           cd ~/ECHOMATELITE/echo-mate-lite-main/backend
