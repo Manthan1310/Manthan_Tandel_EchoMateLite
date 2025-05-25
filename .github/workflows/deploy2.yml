@@ -1,42 +1,35 @@
-name: Deploy to EC2
+name: Deploy on EC2 Runner
 
 on:
   push:
-    branches: [  master ]  # Adjust based on your branch name
+    branches: [main, master]
 
 jobs:
   deploy:
     runs-on: self-hosted
-
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm install --production
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/ECHOMATELITE/echo-mate-lite-main
-            git pull origin main
+    - name: Install frontend dependencies and build
+      run: |
+        cd frontend/twitterclone
+        npm install
+        npm run build
 
-            cd backend
-            npm install --production
+    - name: Clean old build and deploy frontend
+      run: |
+        sudo rm -rf /var/www/html/*
+        sudo cp -r frontend/twitterclone/build/* /var/www/html/
 
-            cd ../frontend/twitterclone
-            npm install
-            npm run build
+    - name: Restart backend
+      run: pm2 restart echomatelite-backend || pm2 start backend/index.js --name echomatelite-backend
 
-            sudo rm -rf /var/www/html/*
-            sudo cp -r build/* /var/www/html/
-
-            pm2 restart echomatelite-backend || pm2 start index.js --name echomatelite-backend
-            sudo systemctl reload apache2
+    - name: Reload Apache
+      run: sudo systemctl reload apache2
