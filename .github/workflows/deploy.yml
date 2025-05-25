@@ -2,7 +2,9 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -15,8 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-        node-version: '18'  # removed cache
-
+          node-version: '18'
 
       - name: Install backend dependencies
         run: |
@@ -40,29 +41,21 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Navigate to the project root
             cd ~/ECHOMATELITE/echo-mate-lite-main
+            git pull origin main
 
-            # Pull the latest code from the correct branch
-            git pull origin $(git rev-parse --abbrev-ref HEAD)
-
-            # Install backend dependencies
             cd backend
             npm install --production
 
-            # Build frontend
             cd ../frontend/twitterclone
             npm install
             npm run build
 
-            # Clean old files from Apache root and deploy new build
             sudo rm -rf /var/www/html/*
             sudo cp -r build/* /var/www/html/
 
-            # Restart backend server with PM2
             pm2 restart echomatelite-backend || pm2 start index.js --name echomatelite-backend
 
-            # Reload Apache
             sudo systemctl reload apache2
 
             echo "✅ Deployment completed successfully!"
