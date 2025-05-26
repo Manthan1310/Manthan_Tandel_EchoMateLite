@@ -104,7 +104,7 @@ const CreatePost = () => {
           <div className="border-b border-gray-200 p-4">
             <p className="text-gray-700 text-base break-words">
               {/* This ensures long text dynamically wraps */}
-              This is final testing , im pushing this from local it should automatic reflect on server , connect with a vibrant community, and let your ideas inspire the world. Share your thoughts, your dreams, and your stories—because every word matters and every voice deserves to be heard. This is your space to connect, create, and ignite change. Write boldly, share passionately, and watch how your ideas resonate and make a difference!
+              This is testing cicd for the video  , im pushing this from local it should automatic reflect on server , connect with a vibrant community, and let your ideas inspire the world. Share your thoughts, your dreams, and your stories—because every word matters and every voice deserves to be heard. This is your space to connect, create, and ignite change. Write boldly, share passionately, and watch how your ideas resonate and make a difference!
             </p>
           </div>
         </div>
