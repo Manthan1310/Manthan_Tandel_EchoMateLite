@@ -52,6 +52,7 @@ jobs:
           cd ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone
           export NODE_OPTIONS="--max-old-space-size=4096"
           export GENERATE_SOURCEMAP=false
+          export CI=false
           npm run build
           echo "Build completed successfully"
           
