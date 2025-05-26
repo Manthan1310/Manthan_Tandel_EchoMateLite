@@ -17,17 +17,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Full history for proper git operations
-       
-      - name: 🔍 Verify Git State
-        run: |
-          echo "=== Current Branch ==="
-          git branch -vv
-          echo "=== Latest Commit ==="
-          git log -1 --oneline
-          echo "=== Changed Files ==="
-          git diff --name-only HEAD~1
-
-      
+          timeout-minutes: 10
+          retry-on-error: true
 
       - name: 🔄 Sync with remote
         run: |
@@ -260,4 +251,4 @@ jobs:
           echo "If you don't see changes, try:"
           echo "  1. Hard refresh your browser (Ctrl+F5 or Cmd+Shift+R)"
           echo "  2. Open in incognito/private mode"
-          echo "  3. Clear browser cache" 
+          echo "  3. Clear browser cache"
