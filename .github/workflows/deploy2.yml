@@ -13,50 +13,96 @@ jobs:
       - name: 🚀 Starting deployment
         run: echo "Starting deployment at $(date)"
 
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Full history for proper git operations
-          timeout-minutes: 10
-          retry-on-error: true
-
-      - name: 🔄 Sync with remote
+      - name: 📥 Sync repository from GitHub
         run: |
-          echo "Current branch: $(git branch --show-current)"
-          git fetch --all --prune
-          git reset --hard origin/$(git branch --show-current)
-          echo "Latest commit: $(git log -1 --oneline)"
+          echo "Syncing with GitHub repository..."
+          
+          # Navigate to your project directory
+          cd ~/ECHOMATELITE/echo-mate-lite-main
+          
+          # Show current status
+          echo "=== Current Status ==="
+          git status
+          git log -1 --oneline
+          
+          # Stash any local changes to avoid conflicts
+          git stash push -m "Auto-stash before deployment $(date)"
+          
+          # Force fetch all branches and tags
+          echo "=== Fetching from GitHub ==="
+          git fetch --all --prune --force
+          git fetch --tags --force
+          
+          # Determine the current branch or default to main
+          CURRENT_BRANCH=$(git branch --show-current)
+          if [ -z "$CURRENT_BRANCH" ] || [ "$CURRENT_BRANCH" = "HEAD" ]; then
+            CURRENT_BRANCH="main"
+            echo "Switching to main branch"
+            git checkout main || git checkout -b main origin/main
+          fi
+          
+          echo "Working on branch: $CURRENT_BRANCH"
+          
+          # Hard reset to the latest commit from GitHub
+          echo "=== Resetting to latest GitHub version ==="
+          git reset --hard origin/$CURRENT_BRANCH
+          
+          # Verify we have the latest changes
+          echo "=== After Sync ==="
+          git log -1 --oneline
+          echo "=== Recent Commits ==="
+          git log --oneline -5
+          
+          echo "✅ Repository synced successfully"
 
       - name: 🧹 Clean previous builds
         run: |
           echo "Cleaning old build artifacts..."
-          rm -rf ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone/build
-          rm -rf ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone/node_modules/.cache
+          cd ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone
+          
+          # Remove build directory and cache
+          rm -rf build/
+          rm -rf node_modules/.cache/
+          
+          # Clear npm cache
+          npm cache clean --force
+          
+          echo "✅ Clean completed"
 
-      - name: 📦 Install and verify backend dependencies
+      - name: 📦 Install backend dependencies
         run: |
           echo "Installing backend dependencies..."
           cd ~/ECHOMATELITE/echo-mate-lite-main/backend
+          
+          # Clean install dependencies
+          rm -rf node_modules/
           npm ci --only=production
-          echo "Backend dependencies installed successfully"
-          ls -la node_modules/ | head -10
+          
+          echo "✅ Backend dependencies installed"
 
       - name: 🔧 Install frontend dependencies
         run: |
           echo "Installing frontend dependencies..."
           cd ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone
+          
+          # Clean install dependencies
+          rm -rf node_modules/
           npm ci
-          echo "Frontend dependencies installed successfully"
+          
+          echo "✅ Frontend dependencies installed"
 
       - name: 🏗️ Build frontend application
         run: |
           echo "Building React application..."
           cd ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone
+          
+          # Set build environment
           export NODE_OPTIONS="--max-old-space-size=4096"
           export GENERATE_SOURCEMAP=false
           export CI=false
+          
+          # Build the application
           npm run build
-          echo "Build completed successfully"
           
           # Verify build output
           if [ -d "build" ]; then
@@ -68,29 +114,22 @@ jobs:
             echo "❌ Build directory not found!"
             exit 1
           fi
-
-      - name: 🧪 Verify build integrity
-        run: |
-          cd ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone/build
-          if [ -f "index.html" ]; then
+          
+          # Check for critical files
+          if [ -f "build/index.html" ]; then
             echo "✅ index.html exists"
-            echo "HTML file size: $(wc -c < index.html) bytes"
+            echo "HTML file size: $(wc -c < build/index.html) bytes"
           else
             echo "❌ index.html not found in build!"
             exit 1
           fi
           
-          if [ -d "static" ]; then
-            echo "✅ Static assets directory exists"
-            echo "Static files count: $(find static -type f | wc -l)"
-          else
-            echo "⚠️ No static directory found"
-          fi
+          echo "✅ Build completed successfully"
 
       - name: 🔒 Backup current deployment
         run: |
           echo "Creating backup of current deployment..."
-          if [ -d "/var/www/html" ] && [ "$(ls -A /var/www/html)" ]; then
+          if [ -d "/var/www/html" ] && [ "$(ls -A /var/www/html 2>/dev/null)" ]; then
             sudo mkdir -p /var/backups/html-backups
             sudo cp -r /var/www/html "/var/backups/html-backups/backup-$(date +%Y%m%d-%H%M%S)"
             echo "✅ Backup created successfully"
@@ -109,8 +148,9 @@ jobs:
           sudo rm -rf /var/www/html/*
           sudo rm -rf /var/www/html/.[^.]*  # Remove hidden files
           
-          # Add timestamp to verify deployment
+          # Add deployment verification file
           echo "Deployment timestamp: $(date)" | sudo tee /var/www/html/deployment.txt
+          echo "Git commit: $(cd ~/ECHOMATELITE/echo-mate-lite-main && git log -1 --oneline)" | sudo tee -a /var/www/html/deployment.txt
           
           # Copy new build
           sudo cp -r ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone/build/* /var/www/html/
@@ -120,12 +160,12 @@ jobs:
           sudo chmod -R 755 /var/www/html/
           sudo find /var/www/html -type f -exec chmod 644 {} \;
           
-          # Verify deployment with file content check
+          # Verify deployment
           echo "Deployed files:"
           sudo ls -la /var/www/html/
-          echo "Index.html preview:"
-          sudo head -10 /var/www/html/index.html
-          echo "Deployment timestamp file:"
+          echo "Index.html preview (first 5 lines):"
+          sudo head -5 /var/www/html/index.html
+          echo "Deployment info:"
           sudo cat /var/www/html/deployment.txt
           
           echo "✅ Frontend deployed successfully"
@@ -134,7 +174,10 @@ jobs:
         run: |
           echo "Configuring Apache for Single Page Application..."
           
-          # Create simple .htaccess for React Router support
+          # Enable required Apache modules
+          sudo a2enmod rewrite headers expires
+          
+          # Create .htaccess for React Router support
           sudo tee /var/www/html/.htaccess > /dev/null << 'EOF'
           Options -MultiViews
           RewriteEngine On
@@ -156,35 +199,51 @@ jobs:
           sudo apache2ctl configtest
           echo "✅ Apache configuration updated"
 
-      - name: 🔄 Restart backend service
+      - name: 🔄 Manage backend service
         run: |
           echo "Managing backend service..."
           
-          # Check if PM2 process exists
+          # Navigate to backend directory
+          cd ~/ECHOMATELITE/echo-mate-lite-main/backend
+          
+          # Check if PM2 process exists and restart/start accordingly
           if pm2 list | grep -q "echomatelite-backend"; then
             echo "Restarting existing backend process..."
             pm2 restart echomatelite-backend
           else
             echo "Starting new backend process..."
-            cd ~/ECHOMATELITE/echo-mate-lite-main/backend
             pm2 start index.js --name echomatelite-backend
           fi
           
+          # Wait for process to stabilize
+          sleep 5
+          
           # Verify backend is running
-          sleep 3
-          pm2 show echomatelite-backend
-          echo "✅ Backend service updated"
+          if pm2 list | grep -q "echomatelite-backend.*online"; then
+            echo "✅ Backend service is running"
+            pm2 show echomatelite-backend
+          else
+            echo "❌ Backend service failed to start"
+            pm2 logs echomatelite-backend --lines 20
+            exit 1
+          fi
 
       - name: 🌐 Start web server
         run: |
           echo "Starting Apache web server..."
           
-          # Test Apache configuration
-          sudo apache2ctl configtest
+          # Test Apache configuration before starting
+          if ! sudo apache2ctl configtest; then
+            echo "❌ Apache configuration test failed"
+            exit 1
+          fi
           
           # Start Apache
           sudo systemctl start apache2
           sudo systemctl enable apache2
+          
+          # Wait for Apache to fully start
+          sleep 3
           
           # Verify Apache is running
           if sudo systemctl is-active --quiet apache2; then
@@ -192,6 +251,7 @@ jobs:
           else
             echo "❌ Apache failed to start"
             sudo systemctl status apache2
+            sudo tail -10 /var/log/apache2/error.log
             exit 1
           fi
 
@@ -199,56 +259,81 @@ jobs:
         run: |
           echo "Verifying deployment..."
           
-          # Wait for services to be fully ready
-          sleep 5
+          # Wait for all services to be ready
+          sleep 10
           
-          # Check if website is accessible
+          # Test local HTTP connection
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost || echo "000")
-          echo "HTTP Status: $HTTP_STATUS"
+          echo "Local HTTP Status: $HTTP_STATUS"
           
-          if [ "$HTTP_STATUS" = "200" ]; then
-            echo "✅ Website is accessible (HTTP 200)"
-          else
-            echo "⚠️ Website returned HTTP $HTTP_STATUS"
-            echo "Apache error log (last 10 lines):"
-            sudo tail -10 /var/log/apache2/error.log || echo "No error log found"
-          fi
+          # Test HTTPS connection
+          HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://localhost -k || echo "000")
+          echo "Local HTTPS Status: $HTTPS_STATUS"
           
-          # Check if React app loads properly
-          CONTENT=$(curl -s http://localhost | head -20)
+          # Check if HTML content is being served
+          CONTENT=$(curl -s http://localhost | head -10)
           if echo "$CONTENT" | grep -q "<!doctype html>"; then
-            echo "✅ HTML content is being served"
+            echo "✅ HTML content is being served correctly"
           else
             echo "⚠️ Unexpected content served"
+            echo "Content preview:"
+            echo "$CONTENT"
+          fi
+          
+          # Check deployment timestamp
+          DEPLOY_CHECK=$(curl -s http://localhost/deployment.txt 2>/dev/null || echo "File not found")
+          echo "Deployment verification:"
+          echo "$DEPLOY_CHECK"
+          
+          if [[ "$HTTP_STATUS" == "200" ]]; then
+            echo "✅ Website is accessible and serving content"
+          else
+            echo "⚠️ Website accessibility issues detected"
+            echo "Checking Apache error logs:"
+            sudo tail -20 /var/log/apache2/error.log
           fi
 
       - name: 📊 Deployment summary
         run: |
-          echo "=== DEPLOYMENT SUMMARY ==="
+          echo "================================="
+          echo "🎉 DEPLOYMENT SUMMARY"
+          echo "================================="
           echo "Deployment completed at: $(date)"
-          echo "Commit: $(git log -1 --oneline)"
-          echo "Frontend build size: $(du -sh /var/www/html/)"
-          echo "Backend status: $(pm2 show echomatelite-backend | grep 'status' || echo 'Status check failed')"
+          echo "Git commit: $(cd ~/ECHOMATELITE/echo-mate-lite-main && git log -1 --oneline)"
+          echo "Frontend build size: $(du -sh /var/www/html/ 2>/dev/null || echo 'Unknown')"
+          echo "Backend status: $(pm2 list | grep echomatelite-backend || echo 'Not found')"
           echo "Apache status: $(sudo systemctl is-active apache2)"
-          echo "=========================="
+          echo "Website URL: https://mytechops.cloud"
+          echo "================================="
 
       - name: 🧹 Cleanup
         if: always()
         run: |
           echo "Performing cleanup..."
-          # Clean up old PM2 logs
-          pm2 flush
           
-          # Clean up old backups (keep last 5)
-          sudo find /var/backups/html-backups -type d -name "backup-*" | sort | head -n -5 | sudo xargs rm -rf 2>/dev/null || true
+          # Clean up old PM2 logs
+          pm2 flush echomatelite-backend 2>/dev/null || true
+          
+          # Clean up old backups (keep last 3)
+          sudo find /var/backups/html-backups -type d -name "backup-*" | sort | head -n -3 | sudo xargs rm -rf 2>/dev/null || true
+          
+          # Clean up temporary files
+          cd ~/ECHOMATELITE/echo-mate-lite-main/frontend/twitterclone
+          rm -rf node_modules/.cache/ 2>/dev/null || true
           
           echo "✅ Cleanup completed"
 
       - name: 🎉 Deployment complete
         run: |
-          echo "🎉 Deployment completed successfully!"
-          echo "Your website should now be updated with the latest changes."
-          echo "If you don't see changes, try:"
-          echo "  1. Hard refresh your browser (Ctrl+F5 or Cmd+Shift+R)"
+          echo ""
+          echo "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!"
+          echo ""
+          echo "Your website has been updated with the latest changes."
+          echo "Visit: https://mytechops.cloud"
+          echo ""
+          echo "If you don't see changes immediately:"
+          echo "  1. Hard refresh: Ctrl+F5 (Windows/Linux) or Cmd+Shift+R (Mac)"
           echo "  2. Open in incognito/private mode"
-          echo "  3. Clear browser cache"
+          echo "  3. Clear browser cache for the site"
+          echo "  4. Check deployment timestamp: https://mytechops.cloud/deployment.txt"
+          echo ""
