@@ -164,7 +164,6 @@ jobs:
             ExpiresActive On
             ExpiresDefault "access plus 1 year"
           </FilesMatch>
-          EOF
           
           # Enable gzip compression
           <IfModule mod_deflate.c>
